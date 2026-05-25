@@ -1,0 +1,31 @@
+{
+  "name": "abra-call-review",
+  "version": "1.0.0",
+  "description": "2-tab web app for call funnel tracking (Callback Worklist + Google Ads Review)",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test tests/**/*.test.js",
+    "test:unit": "node --test tests/unit/**/*.test.js",
+    "test:integration": "node --test tests/integration/**/*.test.js",
+    "test:e2e": "node --test tests/e2e/**/*.test.js"
+  },
+  "keywords": [
+    "call-tracking",
+    "callback-worklist",
+    "google-ads-review",
+    "sqlite"
+  ],
+  "author": "Maira Noor <mairanoor412@gmail.com>",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

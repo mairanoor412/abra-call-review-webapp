@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Abra Call Review - Phase A</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+  <header>
+    <h1>Abra Call Review</h1>
+    <p class="subtitle">Phase A - Call Funnel Tracking</p>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-button active" onclick="switchTab('callbacks')">
+      Tab 1: Callback Worklist
+    </button>
+    <button class="tab-button" onclick="switchTab('ad-review')">
+      Tab 2: Google Ads Call Review
+    </button>
+  </nav>
+
+  <main>
+    <!-- Tab 1: Callback Worklist -->
+    <div id="tab-callbacks" class="tab-content active">
+      <div id="callback-container"></div>
+    </div>
+
+    <!-- Tab 2: Google Ads Call Review -->
+    <div id="tab-ad-review" class="tab-content">
+      <div id="ad-review-container"></div>
+    </div>
+  </main>
+
+  <script>
+    // Tab switching logic
+    function switchTab(tabName) {
+      // Hide all tabs
+      const tabs = document.querySelectorAll('.tab-content');
+      tabs.forEach(tab => tab.classList.remove('active'));
+
+      // Remove active class from all buttons
+      const buttons = document.querySelectorAll('.tab-button');
+      buttons.forEach(btn => btn.classList.remove('active'));
+
+      // Show selected tab
+      const selectedTab = document.getElementById(`tab-${tabName}`);
+      if (selectedTab) {
+        selectedTab.classList.add('active');
+      }
+
+      // Mark selected button as active
+      event.target.classList.add('active');
+
+      // Load tab content
+      if (tabName === 'callbacks') {
+        loadCallbackWorklist();
+      } else if (tabName === 'ad-review') {
+        loadAdReview();
+      }
+    }
+
+    // Load callback worklist on page load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadCallbackWorklist();
+    });
+
+    // Load callback worklist from API
+    function loadCallbackWorklist() {
+      const container = document.getElementById('callback-container');
+
+      // Show loading state
+      container.innerHTML = '<div class="loading">Loading callbacks...</div>';
+
+      // Fetch from API
+      fetch('/api/callbacks')
+        .then(response => response.json())
+        .then(data => {
+          renderCallbackWorklist(data);
+        })
+        .catch(error => {
+          console.error('Error loading callbacks:', error);
+          container.innerHTML = `
+            <div class="error">
+              <p>Failed to load callbacks. Please try again.</p>
+              <button onclick="loadCallbackWorklist()">Retry</button>
+            </div>
+          `;
+        });
+    }
+
+    // Render callback worklist UI
+    function renderCallbackWorklist(data) {
+      const container = document.getElementById('callback-container');
+      const { callbacks, stats, filters } = data;
+
+      let html = `
+        <div class="worklist-header">
+          <h2>Callback Worklist</h2>
+          <div class="stats">
+            <span class="stat-item">Total Missed: ${stats.total_missed}</span>
+            <span class="stat-item">Actioned: ${stats.total_actioned}</span>
+            <span class="stat-item pending">Pending: ${stats.total_pending}</span>
+          </div>
+        </div>
+
+        <div class="filters">
+          <div class="practice-filters">
+            <button class="filter-chip ${filters.practice === 'all' ? 'active' : ''}"
+                    onclick="filterByPractice('all')">All</button>
+            <button class="filter-chip ${filters.practice === 'practice1' ? 'active' : ''}"
+                    onclick="filterByPractice('practice1')">Practice 1</button>
+            <button class="filter-chip ${filters.practice === 'practice2' ? 'active' : ''}"
+                    onclick="filterByPractice('practice2')">Practice 2</button>
+            <button class="filter-chip ${filters.practice === 'unattributed' ? 'active' : ''}"
+                    onclick="filterByPractice('unattributed')">Unattributed</button>
+          </div>
+        </div>
+
+        <div class="callbacks-list">
+      `;
+
+      if (callbacks.length === 0) {
+        html += '<div class="empty-state"><p>No callbacks pending ✓</p></div>';
+      } else {
+        callbacks.forEach(callback => {
+          html += renderCallbackRow(callback);
+        });
+      }
+
+      html += '</div>';
+
+      container.innerHTML = html;
+    }
+
+    // Render individual callback row
+    function renderCallbackRow(callback) {
+      const time = new Date(callback.most_recent_call_time).toLocaleString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      return `
+        <div class="callback-row" data-caller="${callback.caller_number}">
+          <div class="callback-info">
+            <div class="callback-header">
+              <span class="phone">${callback.masked_phone}</span>
+              <span class="time">${time}</span>
+              ${callback.attempt_count > 1 ? `<span class="badge attempt">${callback.attempt_count} attempts</span>` : ''}
+              ${callback.is_new_patient ? '<span class="badge new-patient">NEW PATIENT</span>' : ''}
+              <span class="badge reason">${callback.reason}</span>
+            </div>
+            <div class="callback-details">
+              <span class="practice">Practice: ${callback.practice}</span>
+              ${callback.has_transcript ?
+                `<p class="transcript">${callback.transcript_snippet}</p>` :
+                '<p class="no-transcript">(no transcript)</p>'
+              }
+            </div>
+          </div>
+          <div class="callback-actions">
+            <select class="outcome-select" id="outcome-${callback.caller_number}">
+              <option value="called_back">Called back</option>
+              <option value="vm_left">Left VM</option>
+              <option value="booked">Booked appt</option>
+              <option value="wrong_number">Wrong number</option>
+              <option value="not_relevant">Not relevant</option>
+            </select>
+            <input type="text"
+                   class="notes-input"
+                   id="notes-${callback.caller_number}"
+                   placeholder="Optional notes (max 500 chars)"
+                   maxlength="500">
+            <button class="tick-button"
+                    onclick="tickCallback('${callback.caller_number}', '${callback.practice}', '${callback.most_recent_call_time}')">
+              ✓ Done
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Filter by practice
+    function filterByPractice(practice) {
+      fetch(`/api/callbacks?practice=${practice}`)
+        .then(response => response.json())
+        .then(data => {
+          renderCallbackWorklist(data);
+        })
+        .catch(error => {
+          console.error('Error filtering callbacks:', error);
+        });
+    }
+
+    // Tick callback as actioned
+    function tickCallback(callerNumber, practice, missedAt) {
+      const outcome = document.getElementById(`outcome-${callerNumber}`).value;
+      const notes = document.getElementById(`notes-${callerNumber}`).value;
+
+      // FR-014: Submit to API
+      fetch('/api/callbacks/tick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caller_number: callerNumber,
+          practice: practice,
+          most_recent_missed_at: missedAt,
+          outcome: outcome,
+          notes: notes || null
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => Promise.reject(err));
+        }
+        return response.json();
+      })
+      .then(data => {
+        // FR-015: Grey row and reload list
+        const row = document.querySelector(`[data-caller="${callerNumber}"]`);
+        row.classList.add('actioned');
+
+        // Reload after short delay to show the greyed state
+        setTimeout(() => {
+          loadCallbackWorklist();
+        }, 500);
+      })
+      .catch(error => {
+        // FR-016: Show inline error
+        console.error('Error ticking callback:', error);
+        alert(`Failed to save callback action: ${error.error || error.message}`);
+      });
+    }
+
+    // ===== TAB 2: GOOGLE ADS CALL REVIEW =====
+
+    // Tab 2 state
+    let adReviewState = {
+      date: getYesterday(),
+      practice: 'all',
+      unreviewed_only: true,
+      new_patient_only: false
+    };
+
+    function getYesterday() {
+      const d = new Date();
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().split('T')[0];
+    }
+
+    // Load ad review data
+    function loadAdReview() {
+      const container = document.getElementById('ad-review-container');
+      container.innerHTML = '<div class="loading">Loading ad calls...</div>';
+
+      const params = new URLSearchParams({
+        date: adReviewState.date,
+        practice: adReviewState.practice,
+        unreviewed_only: adReviewState.unreviewed_only,
+        new_patient_only: adReviewState.new_patient_only
+      });
+
+      fetch(`/api/ad-calls?${params}`)
+        .then(response => response.json())
+        .then(data => {
+          renderAdReview(data);
+        })
+        .catch(error => {
+          console.error('Error loading ad calls:', error);
+          container.innerHTML = `
+            <div class="error">
+              <p>Failed to load ad calls. Please try again.</p>
+              <button onclick="loadAdReview()">Retry</button>
+            </div>
+          `;
+        });
+    }
+
+    // Render ad review UI
+    function renderAdReview(data) {
+      const container = document.getElementById('ad-review-container');
+      const { ad_calls, metrics, filters, overall_stats } = data;
+
+      let html = `
+        <div class="ad-review-header">
+          <h2>Google Ads Call Review</h2>
+          <div class="date-picker">
+            <label>Date:</label>
+            <input type="date" id="ad-date" value="${filters.date}" onchange="changeAdDate(this.value)">
+          </div>
+        </div>
+
+        <!-- FR-018: Headline Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <div class="metric-value">${metrics.total_ad_calls}</div>
+            <div class="metric-label">Total Ad Calls</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">${metrics.haiku_new_patient_count}</div>
+            <div class="metric-label">Haiku NEW</div>
+          </div>
+          <div class="metric-card highlight">
+            <div class="metric-value">${metrics.human_confirmed_count}</div>
+            <div class="metric-label">Human Confirmed</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-value">£${metrics.ad_spend_gbp.toFixed(2)}</div>
+            <div class="metric-label">Ad Spend</div>
+          </div>
+          <div class="metric-card ${metrics.cost_per_confirmed ? '' : 'muted'}">
+            <div class="metric-value">${metrics.cost_per_confirmed ? '£' + metrics.cost_per_confirmed.toFixed(2) : 'N/A'}</div>
+            <div class="metric-label">Cost / Confirmed</div>
+          </div>
+        </div>
+
+        <!-- FR-032: Data Quality Banner -->
+        <div class="data-quality-banner">
+          <span>⚠️ Only ${overall_stats.match_rate_percent}% of ad calls matched to recordings</span>
+        </div>
+
+        <!-- Filters -->
+        <div class="filters">
+          <div class="practice-filters">
+            <button class="filter-chip ${filters.practice === 'all' ? 'active' : ''}"
+                    onclick="filterAdByPractice('all')">All</button>
+            <button class="filter-chip ${filters.practice === 'practice1' ? 'active' : ''}"
+                    onclick="filterAdByPractice('practice1')">Practice 1</button>
+            <button class="filter-chip ${filters.practice === 'practice2' ? 'active' : ''}"
+                    onclick="filterAdByPractice('practice2')">Practice 2</button>
+            <button class="filter-chip ${filters.practice === 'unattributed' ? 'active' : ''}"
+                    onclick="filterAdByPractice('unattributed')">Unattributed</button>
+          </div>
+          <div class="toggle-filters">
+            <label class="toggle">
+              <input type="checkbox" ${filters.unreviewed_only ? 'checked' : ''} onchange="toggleUnreviewed(this.checked)">
+              <span>Show unreviewed only</span>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" ${filters.new_patient_only ? 'checked' : ''} onchange="toggleNewPatientOnly(this.checked)">
+              <span>Show only NEW_PATIENT</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="ad-calls-list">
+      `;
+
+      if (ad_calls.length === 0) {
+        html += '<div class="empty-state"><p>No ad calls to review ✓</p></div>';
+      } else {
+        ad_calls.forEach(call => {
+          html += renderAdCallRow(call);
+        });
+      }
+
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    // Render individual ad call row
+    function renderAdCallRow(call) {
+      // FR-051: Auto-expand transcript for new_patient or unclear
+      const shouldExpand = call.is_new_patient || call.is_unclear;
+
+      return `
+        <div class="ad-call-row ${call.is_reviewed ? 'reviewed' : ''}" data-ad-call-id="${call.ad_call_id}">
+          <div class="ad-call-info">
+            <div class="ad-call-header">
+              <span class="phone">${call.masked_phone}</span>
+              <span class="time">${call.call_time_formatted}</span>
+              <span class="duration">${call.duration_formatted}</span>
+              ${call.is_new_patient ? '<span class="badge new-patient">NEW PATIENT</span>' : ''}
+              ${call.is_unclear ? '<span class="badge unclear">UNCLEAR</span>' : ''}
+              ${call.classification_type && !call.is_new_patient && !call.is_unclear ?
+                `<span class="badge classification">${call.classification_type}</span>` : ''}
+              ${call.is_reviewed ? '<span class="reviewed-check">✓ Reviewed</span>' : ''}
+            </div>
+            <div class="ad-call-details">
+              <span class="campaign">📢 ${call.campaign || 'Unknown campaign'}</span>
+              <span class="keyword">🔍 "${call.keyword || 'N/A'}"</span>
+              <span class="spend">💰 £${(call.spend_gbp || 0).toFixed(2)}</span>
+            </div>
+            <!-- FR-019: Handle no transcript gracefully -->
+            ${call.has_transcript ? `
+              <div class="transcript-section ${shouldExpand ? 'expanded' : 'collapsed'}">
+                <button class="expand-btn" onclick="toggleTranscript(${call.ad_call_id})">
+                  ${shouldExpand ? '▼' : '▶'} Transcript
+                </button>
+                <div class="transcript-content" id="transcript-${call.ad_call_id}" style="display: ${shouldExpand ? 'block' : 'none'}">
+                  <p class="transcript">${call.transcript_text}</p>
+                </div>
+              </div>
+            ` : `
+              <p class="no-transcript">(no transcript - pipeline match failed)</p>
+            `}
+          </div>
+          ${!call.is_reviewed ? `
+            <div class="ad-call-actions">
+              <div class="decision-buttons">
+                <button class="decision-btn confirm" onclick="reviewAdCall(${call.ad_call_id}, 'new_patient')">
+                  ✓ Confirm New Patient
+                </button>
+                <button class="decision-btn reject" onclick="reviewAdCall(${call.ad_call_id}, 'not_new_patient')">
+                  ✗ Not New Patient
+                </button>
+                <button class="decision-btn neutral" onclick="reviewAdCall(${call.ad_call_id}, 'booked')">
+                  📅 Booked
+                </button>
+                <button class="decision-btn neutral" onclick="reviewAdCall(${call.ad_call_id}, 'existing')">
+                  👤 Existing
+                </button>
+                <button class="decision-btn spam" onclick="reviewAdCall(${call.ad_call_id}, 'spam_wrong')">
+                  🚫 Spam/Wrong
+                </button>
+              </div>
+              <input type="text"
+                     class="notes-input"
+                     id="ad-notes-${call.ad_call_id}"
+                     placeholder="Optional notes (e.g., 'booked 14 May')"
+                     maxlength="500">
+            </div>
+          ` : `
+            <div class="review-summary">
+              <span class="decision-badge ${call.review_decision}">${formatDecision(call.review_decision)}</span>
+              ${call.review_notes ? `<span class="review-notes">${call.review_notes}</span>` : ''}
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function formatDecision(decision) {
+      const labels = {
+        'new_patient': '✓ New Patient',
+        'not_new_patient': '✗ Not New',
+        'booked': '📅 Booked',
+        'existing': '👤 Existing',
+        'spam_wrong': '🚫 Spam/Wrong'
+      };
+      return labels[decision] || decision;
+    }
+
+    // Toggle transcript visibility
+    function toggleTranscript(adCallId) {
+      const content = document.getElementById(`transcript-${adCallId}`);
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+    }
+
+    // Change date filter
+    function changeAdDate(date) {
+      adReviewState.date = date;
+      loadAdReview();
+    }
+
+    // Filter by practice
+    function filterAdByPractice(practice) {
+      adReviewState.practice = practice;
+      loadAdReview();
+    }
+
+    // Toggle unreviewed only
+    function toggleUnreviewed(checked) {
+      adReviewState.unreviewed_only = checked;
+      loadAdReview();
+    }
+
+    // Toggle new patient only
+    function toggleNewPatientOnly(checked) {
+      adReviewState.new_patient_only = checked;
+      loadAdReview();
+    }
+
+    // Submit ad call review decision
+    function reviewAdCall(adCallId, decision) {
+      const notesEl = document.getElementById(`ad-notes-${adCallId}`);
+      const notes = notesEl ? notesEl.value : null;
+
+      fetch('/api/ad-calls/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ad_call_id: adCallId,
+          decision: decision,
+          notes: notes || null
+        })
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(err => Promise.reject(err));
+        }
+        return response.json();
+      })
+      .then(data => {
+        // FR-026: Show success and update headline
+        const row = document.querySelector(`[data-ad-call-id="${adCallId}"]`);
+        row.classList.add('reviewed');
+
+        // Reload to update metrics
+        setTimeout(() => {
+          loadAdReview();
+        }, 300);
+      })
+      .catch(error => {
+        console.error('Error reviewing ad call:', error);
+        alert(`Failed to save review: ${error.error || error.message}`);
+      });
+    }
+  </script>
+</body>
+</html>
