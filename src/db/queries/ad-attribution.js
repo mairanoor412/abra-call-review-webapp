@@ -49,32 +49,34 @@ export function fetchAdAttribution(options = {}) {
   }
 
   // FR-017: Query ad_calls joined to recordings → transcripts → classifications
+  // Adapted for Sohail's database schema
   const adCallsQuery = `
     SELECT
       ac.id as ad_call_id,
       ac.caller_number,
-      ac.timestamp as call_time,
-      c.practice,
-      ac.ad_campaign,
-      ac.ad_group,
-      ac.keyword,
-      ac.match_type,
-      ac.spend_gbp,
-      ac.call_id as matched_call_id,
-      c.duration_sec,
+      ac.call_time,
+      ac.practice,
+      ac.campaign as ad_campaign,
+      ac.call_type,
+      ac.call_source,
+      ac.status as ad_status,
+      ac.matched_call_id,
+      ac.duration_sec,
+      c.id as call_id,
       r.id as recording_id,
-      r.file_path,
-      t.transcript,
-      cl.classification
+      r.filepath as file_path,
+      t.text as transcript,
+      cl.type as classification,
+      cl.promised_callback
     FROM ad_calls ac
-    LEFT JOIN calls c ON ac.call_id = c.id
-    LEFT JOIN recordings_v2 r ON c.id = r.call_id
+    LEFT JOIN calls c ON ac.matched_call_id = c.call_id
+    LEFT JOIN recordings_v2 r ON c.call_id = r.call_id
     LEFT JOIN transcripts t ON r.id = t.recording_id
-    LEFT JOIN classifications cl ON r.id = cl.recording_id
-    WHERE ac.timestamp LIKE ?
-      AND ac.timestamp LIKE '2026-%'  -- FR-035: Filter junk rows
+    LEFT JOIN classifications cl ON t.id = cl.transcript_id
+    WHERE ac.call_time LIKE ?
+      AND ac.call_time LIKE '2026-%'
       ${practiceWhere}
-    ORDER BY ac.timestamp DESC
+    ORDER BY ac.call_time DESC
   `;
 
   const params = practiceParam
@@ -248,11 +250,11 @@ export function getAdAttributionStats() {
     .get().count;
 
   const matchedCalls = commsDb
-    .prepare('SELECT COUNT(*) as count FROM ad_calls WHERE call_id IS NOT NULL AND call_id != -1')
+    .prepare("SELECT COUNT(*) as count FROM ad_calls WHERE matched_call_id IS NOT NULL AND matched_call_id != '-1'")
     .get().count;
 
   const unmatchedCalls = commsDb
-    .prepare('SELECT COUNT(*) as count FROM ad_calls WHERE call_id IS NULL OR call_id = -1')
+    .prepare("SELECT COUNT(*) as count FROM ad_calls WHERE matched_call_id IS NULL OR matched_call_id = '-1'")
     .get().count;
 
   const matchRate = totalAdCalls > 0

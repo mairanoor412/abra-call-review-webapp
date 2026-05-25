@@ -80,28 +80,26 @@ export function createHttpServer() {
   });
 }
 
-// Only start server if this is the main module
-if (import.meta.url === `file:///${process.argv[1].replace(/\\/g, '/')}`) {
-  const server = createHttpServer();
+// Start server
+const server = createHttpServer();
 
-  server.listen(PORT, HOST, () => {
-    logger.server.start(PORT, HOST);  // FR-037: Log server startup
-    console.log(`Server running at http://${HOST}:${PORT}/`);
-    console.log(`Press Ctrl+C to stop`);
+server.listen(PORT, HOST, () => {
+  logger.server.start(PORT, HOST);  // FR-037: Log server startup
+  console.log(`Server running at http://${HOST}:${PORT}/`);
+  console.log(`Press Ctrl+C to stop`);
+});
+
+// Graceful shutdown
+function shutdown(signal) {
+  logger.server.stop(signal);  // FR-037: Log server shutdown
+  console.log(`${signal} received, shutting down gracefully...`);
+  server.close(() => {
+    closeCommsDb();
+    closeReviewsDb();
+    console.log('Server closed');
+    process.exit(0);
   });
-
-  // Graceful shutdown
-  function shutdown(signal) {
-    logger.server.stop(signal);  // FR-037: Log server shutdown
-    console.log(`${signal} received, shutting down gracefully...`);
-    server.close(() => {
-      closeCommsDb();
-      closeReviewsDb();
-      console.log('Server closed');
-      process.exit(0);
-    });
-  }
-
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
 }
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

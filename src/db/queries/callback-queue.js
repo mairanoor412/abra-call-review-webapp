@@ -48,32 +48,35 @@ export function fetchCallbackQueue(options = {}) {
 
   // FR-001, FR-002: Fetch missed calls from comms.db
   // Criteria: inbound, within time window, unanswered or short duration or redirected
+  // Adapted for Sohail's database schema
   const missedCallsQuery = `
     SELECT
       c.id as call_id,
+      c.call_id as external_call_id,
       c.caller_number,
       c.practice,
-      c.timestamp as call_time,
-      c.answered,
-      c.duration_sec,
-      c.call_type,
+      c.call_time,
+      c.status,
+      c.talking_sec as duration_sec,
       r.id as recording_id,
-      r.file_path,
-      t.transcript,
-      cl.classification
+      r.filepath as file_path,
+      t.text as transcript,
+      cl.type as classification,
+      cl.promised_callback
     FROM calls c
-    LEFT JOIN recordings_v2 r ON c.id = r.call_id
+    LEFT JOIN recordings_v2 r ON c.call_id = r.call_id
     LEFT JOIN transcripts t ON r.id = t.recording_id
-    LEFT JOIN classifications cl ON r.id = cl.recording_id
+    LEFT JOIN classifications cl ON t.id = cl.transcript_id
     WHERE c.direction = 'inbound'
-      AND c.timestamp >= ?
-      AND c.timestamp LIKE '2026-%'  -- FR-035: Filter junk rows
+      AND c.call_time >= ?
+      AND c.call_time LIKE '2026-%'
       ${practiceWhere}
       AND (
-        c.answered = 0
-        OR (c.answered = 1 AND c.duration_sec < 10)
+        c.status = 'unanswered'
+        OR c.status = 'redirected'
+        OR (c.status = 'answered' AND c.talking_sec < 10)
       )
-    ORDER BY c.timestamp DESC
+    ORDER BY c.call_time DESC
   `;
 
   const params = practiceParam
@@ -87,7 +90,7 @@ export function fetchCallbackQueue(options = {}) {
     SELECT DISTINCT caller_number
     FROM calls
     WHERE direction = 'outbound'
-      AND timestamp >= ?
+      AND call_time >= ?
   `;
   const outboundCallers = new Set(
     commsDb
@@ -141,7 +144,7 @@ export function fetchCallbackQueue(options = {}) {
           : null,
         classification: call.classification || null,
         is_new_patient: call.classification === 'new_patient',
-        reason: call.answered === 0 ? 'unanswered' : 'short_call',
+        reason: call.status === 'unanswered' ? 'unanswered' : (call.status === 'redirected' ? 'redirected' : 'short_call'),
       });
     } else {
       // Increment attempt count for this caller
@@ -190,8 +193,8 @@ export function getCallbackStats() {
     .prepare(
       `SELECT COUNT(*) as count FROM calls
        WHERE direction = 'inbound'
-         AND timestamp >= ?
-         AND answered = 0`
+         AND call_time >= ?
+         AND (status = 'unanswered' OR status = 'redirected')`
     )
     .get(twoDaysAgo).count;
 
@@ -206,7 +209,7 @@ export function getCallbackStats() {
     .prepare(
       `SELECT COUNT(*) as count FROM calls
        WHERE direction = 'inbound'
-         AND timestamp >= ?
+         AND call_time >= ?
          AND practice IS NULL`
     )
     .get(twoDaysAgo).count;

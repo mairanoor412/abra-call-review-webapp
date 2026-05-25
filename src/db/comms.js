@@ -18,7 +18,7 @@ const __dirname = dirname(__filename);
 // Determine environment and database path
 const IS_VPS = existsSync('/home/maira/abra-comms-staging');
 const DB_PATH = IS_VPS
-  ? '/home/maira/abra-comms-staging/data/comms.db'
+  ? '/home/maira/abra-comms-staging/data/comms-local.db'  // Local copy (avoids WAL mode issues with symlink)
   : join(__dirname, '../../seed-data/comms-seed.db');
 
 let db = null;
