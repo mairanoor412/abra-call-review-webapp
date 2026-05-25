@@ -247,9 +247,9 @@
     };
 
     function getYesterday() {
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      return d.toISOString().split('T')[0];
+      // Default to latest date with ad_calls data
+      // TODO: Fetch dynamically when ingestion runs regularly
+      return '2026-05-18';
     }
 
     // Load ad review data
