@@ -13,11 +13,11 @@ Built for the AI Systems Operator position assessment at Abra & Co.
 ## Features
 
 ### Tab 1: Callback Worklist
-- Shows missed/unanswered inbound calls from last 2 days
+- Shows missed/unanswered inbound calls from last 7 days (configurable in `date-utils.js`)
 - Excludes calls already followed up
 - Deduplicates by caller number with attempt count
 - Actions: Called back, Left VM, Booked appt, Wrong number, Not relevant
-- Filter by practice or view all
+- Filter by practice: Heald Green, Winsford, Middleton, Heckmondwike, Cheadle, Unattributed
 
 ### Tab 2: Google Ads Call Review
 - Shows ad-sourced calls with campaign attribution
@@ -29,7 +29,7 @@ Built for the AI Systems Operator position assessment at Abra & Co.
   - Cost per confirmed new patient
 - Warning banner showing match rate (5.7% of ad calls matched to recordings)
 - Actions: Confirm New Patient, Not New Patient, Booked, Existing, Spam/Wrong
-- Filter by date, practice, unreviewed only, NEW_PATIENT only
+- Filter by date, practice (Heald Green, Winsford, Middleton, Heckmondwike, Cheadle), unreviewed only, NEW_PATIENT only
 
 ## Tech Stack
 
@@ -130,6 +130,12 @@ http://localhost:7000
 ### reviews.db (Write)
 - `callback_actions` - Tab 1 actions (caller_number, action, notes, actioned_at)
 - `ad_call_reviews` - Tab 2 reviews (ad_call_id, decision, notes, reviewed_at)
+
+## Demo Configuration
+
+Current settings for demo purposes:
+- **Tab 1 date filter:** 7 days (production: change to 2 days in `src/lib/date-utils.js` line 22)
+- **Tab 2 default date:** 2026-05-18 (latest ad_calls data available)
 
 ## Data Limitations
 
