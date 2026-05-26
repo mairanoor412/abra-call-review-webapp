@@ -41,9 +41,9 @@ export function fetchAdAttribution(options = {}) {
 
   if (practice !== 'all') {
     if (practice === 'unattributed') {
-      practiceWhere = 'AND c.practice IS NULL';
+      practiceWhere = 'AND ac.practice IS NULL';
     } else {
-      practiceWhere = 'AND c.practice = ?';
+      practiceWhere = 'AND ac.practice = ?';
       practiceParam = practice;
     }
   }
