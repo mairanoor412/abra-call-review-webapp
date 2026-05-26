@@ -204,8 +204,8 @@ Tasks marked with `[P]` can be executed in parallel (different files, no depende
 - [x] T070 [P] Create src/README.md with setup instructions per plan quickstart.md section 1.3
 - [x] T071 [P] Add Phase B features list to README.md per SC-010 (minimum 5 features: auth, public hosting, patient record matching, promised callback extraction, mobile responsive layout)
 - [x] T072 [P] Add troubleshooting section to README.md (port 7000 occupied, comms.db permission denied, reviews.db not created)
-- [ ] T073 Deploy to VPS: Copy src/ to /home/maira/abra-comms-staging/src/, run `node server.js`, verify http://localhost:7000 accessible via SSH tunnel
-- [ ] T074 Final acceptance test: Run all SC-001 through SC-010 from spec, verify 10/10 pass
+- [x] T073 Deploy to VPS: Copy src/ to /home/maira/abra-comms-staging/src/, run `node server.js`, verify http://localhost:7000 accessible via SSH tunnel
+- [x] T074 Final acceptance test: Run all SC-001 through SC-010 from spec, verify 10/10 pass
 
 ### Performance Validation
 
