@@ -18,7 +18,8 @@
  */
 export function getTwoDaysAgo(now = new Date()) {
   const twoDaysAgo = new Date(now);
-  twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+  // Extended to 7 days for demo (original: 2 days)
+  twoDaysAgo.setDate(twoDaysAgo.getDate() - 7);
   return twoDaysAgo.toISOString();
 }
 
